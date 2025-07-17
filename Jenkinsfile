@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-    nodejs 'nodejs-22-6-0'
+    nodejs 'nodejs-22.6.0'
 }
     stages {
         stage('Installing Dependencies') {
