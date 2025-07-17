@@ -12,7 +12,7 @@ pipeline {
             }
         }
 
-        stage('NPM Dependency Audit') {
+        stage('NPM Audit') {
             steps {
                 sh '''
                     npm audit --audit-level=critical
@@ -28,4 +28,8 @@ pipeline {
                     --out './'
                     --format 'ALL'
                     --prettyPrint
-                ''', odcInstallation:
+                ''', odcInstallation: 'OWASP-DepCheck-10'
+            }
+        }
+    }
+}
