@@ -2,10 +2,11 @@ pipeline {
     agent any
 
     tools {
-    nodejs 'nodejs-22.6.0'
-}
+        nodejs 'nodejs-22.6.0'
+    }
     environment {
-        MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
+        // You can build the full MONGO_URI using the injected credentials
+        MONGO_URI = ""
     }
     stages {
         stage('Installing Dependencies') {
@@ -36,14 +37,20 @@ pipeline {
                         junit allowEmptyResults: true, testResults: 'dependency-check-junit.xml'
                     }
                 }
-                 stage('Unit Testing') {
+                stage('Unit Testing') {
                     steps {
-                        withCredentials([usernamePassword(
-                            credentialsId: 'mongo-db-credentials', 
-                            passwordVariable: 'MONGO_PASSWORD', 
-                            usernameVariable: 'MONGO_USERNAME'
-                        )]) {
-                            sh 'npm test'
+                        withCredentials([
+                            string(credentialsId: 'mongo-username', variable: 'MONGO_USERNAME'),
+                            string(credentialsId: 'mongo-password', variable: 'MONGO_PASSWORD')
+                        ]) {
+                            script {
+                                // Build your full Mongo URI including credentials here
+                                env.MONGO_URI = "mongodb+srv://${env.MONGO_USERNAME}:${env.MONGO_PASSWORD}@supercluster.d83jj.mongodb.net/superData"
+                            }
+                            sh '''
+                                echo "Testing with Mongo URI: $MONGO_URI"
+                                npm test
+                            '''
                         }
                     }
                 }
@@ -51,3 +58,4 @@ pipeline {
         }
     }
 }
+
