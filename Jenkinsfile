@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-    nodejs 'nodejs-22.6.0'
-}
+        nodejs 'nodejs-22.6.0'
+    }
     environment {
         MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
     }
@@ -36,19 +36,18 @@ pipeline {
                         junit allowEmptyResults: true, testResults: 'dependency-check-junit.xml'
                     }
                 }
-               
             }
-                  stage('Unit Testing') {
-                        steps {
-                            withCredentials([usernamePassword(
-                                credentialsId: 'mongo-db-credentials', 
-                                passwordVariable: 'MONGO_PASSWORD', 
-                                usernameVariable: 'MONGO_USERNAME'
-                            )]) {
-                                sh 'npm test'
-                            }
-                        }
-                    }
+        }
+        stage('Unit Testing') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'mongo-db-credentials', 
+                    passwordVariable: 'MONGO_PASSWORD', 
+                    usernameVariable: 'MONGO_USERNAME'
+                )]) {
+                    sh 'npm test'
+                }
+            }
         }
     }
 }
