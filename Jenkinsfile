@@ -4,9 +4,8 @@ pipeline {
     tools {
         nodejs 'nodejs-22.6.0'
     }
-    environment {
-        // You can build the full MONGO_URI using the injected credentials
-        MONGO_URI = ""
+   environment {
+        MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
     }
     stages {
         stage('Installing Dependencies') {
