@@ -33,6 +33,17 @@ pipeline {
                         junit allowEmptyResults: true, testResults: 'dependency-check-junit.xml'
                     }
                 }
+                 stage('Unit Testing') {
+                    steps {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'mongo-db-credentials', 
+                            passwordVariable: 'MONGO_PASSWORD', 
+                            usernameVariable: 'MONGO_USERNAME'
+                        )]) {
+                            sh 'npm test'
+                        }
+                    }
+                }
             }
         }
     }
