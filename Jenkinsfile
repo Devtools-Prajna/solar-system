@@ -9,9 +9,16 @@ pipeline {
     environment {
         MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
     }
+    options {
+        disableResume()
+        disableConcurrentBuilds abortPrevious: true
+    }
 
     stages {
         stage('Installing Dependencies') {
+             options { 
+                timestamps() 
+            }
             steps {
                 sh 'npm install --no-audit'
             }
@@ -57,6 +64,9 @@ pipeline {
         }
 
         stage('Unit Testing') {
+             options { 
+                retry(2) 
+            }
             steps {
                 withCredentials([
                     usernamePassword(
