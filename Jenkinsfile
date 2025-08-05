@@ -18,16 +18,14 @@ pipeline {
     }
 
     stages {
-
         stage('Installing Dependencies') {
-            options {
-                timestamps()
-            }
-            steps {
-                sh 'npm install --no-audit'
-            }
-        }
-
+                    options {
+                        timestamps()
+                    }
+                    steps {
+                        sh 'npm install --no-audit'
+                    }
+                }
         stage('NPM Dependency Audit') {
             steps {
                 sh '''
