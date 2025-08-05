@@ -65,24 +65,18 @@ pipeline {
             }
         }
 
-        stage('Unit Testing') {
-            options {
-                retry(2)
-            }
+       stage('Unit Testing') {
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'mongo-db-credentials',
-                        passwordVariable: 'MONGO_PASSWORD',
-                        usernameVariable: 'MONGO_USERNAME'
-                    )
-                ]) {
+                withCredentials([usernamePassword(
+                    credentialsId: 'mongo-db-credentials', 
+                    passwordVariable: 'MONGO_PASSWORD', 
+                    usernameVariable: 'MONGO_USERNAME'
+                )]) {
                     sh 'npm test'
                 }
                 junit allowEmptyResults: true, testResults: 'test-results.xml'
             }
         }
-
         stage('Code Coverage') {
             steps {
                 withCredentials([
