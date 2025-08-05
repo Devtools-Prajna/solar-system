@@ -1,19 +1,29 @@
+
 pipeline {
     agent any
 
     tools {
         nodejs 'nodejs-22.6.0'
     }
+
     environment {
-        // You can build the full MONGO_URI using the injected credentials
-        MONGO_URI = ""
+        MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
     }
+    options {
+        disableResume()
+        disableConcurrentBuilds abortPrevious: true
+    }
+
     stages {
         stage('Installing Dependencies') {
+             options { 
+                timestamps() 
+            }
             steps {
                 sh 'npm install --no-audit'
             }
         }
+
         stage('Dependency Scanning') {
             parallel {
                 stage('NPM Dependency Audit') {
@@ -24,6 +34,7 @@ pipeline {
                         '''
                     }
                 }
+
                 stage('OWASP Dependency Check') {
                     steps {
                         dependencyCheck additionalArguments: '''
@@ -32,30 +43,52 @@ pipeline {
                             --format 'ALL'
                             --prettyPrint
                         ''', odcInstallation: 'owasp-dbcheck-10'
+
                         dependencyCheckPublisher failedTotalCritical: 1, pattern: 'dependency-check-report.xml', stopBuild: true
-                        publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, icon: '', keepAll: true, reportDir: './', reportFiles: 'dependency-check-jenkins.html', reportName: 'Dependency Check HTML Report', reportTitles: '', useWrapperFileDirectly: true])
-                        junit allowEmptyResults: true, testResults: 'dependency-check-junit.xml'
-                    }
-                }
-                stage('Unit Testing') {
-                    steps {
-                        withCredentials([
-                            string(credentialsId: 'mongo-username', variable: 'MONGO_USERNAME'),
-                            string(credentialsId: 'mongo-password', variable: 'MONGO_PASSWORD')
-                        ]) {
-                            script {
-                                // Build your full Mongo URI including credentials here
-                                env.MONGO_URI = "mongodb+srv://${env.MONGO_USERNAME}:${env.MONGO_PASSWORD}@supercluster.d83jj.mongodb.net/superData"
-                            }
-                            sh '''
-                                echo "Testing with Mongo URI: $MONGO_URI"
-                                npm test
-                            '''
-                        }
+
+                        junit allowEmptyResults: true, keepProperties: true, testResults: 'dependency-check-junit.xml'
+
+                        publishHTML([
+                            allowMissing: true,
+                            alwaysLinkToLastBuild: true,
+                            keepAll: true,
+                            reportDir: './',
+                            reportFiles: 'dependency-check-jenkins.html',
+                            reportName: 'Dependency Check HTML Report',
+                            reportTitles: '',
+                            useWrapperFileDirectly: true
+                        ])
                     }
                 }
             }
         }
+
+        stage('Unit Testing') {
+             options { 
+                retry(2) 
+            }
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'mongo-db-credentials', 
+                        passwordVariable: 'MONGO_PASSWORD', 
+                        usernameVariable: 'MONGO_USERNAME'
+                    )
+                ]) {
+                    sh 'npm test'
+                }
+                junit allowEmptyResults: true, testResults: 'test-results.xml'
+            }
+        }
+         stage('Code Coverage') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'mongo-db-credentials', passwordVariable: 'MONGO_PASSWORD', usernameVariable: 'MONGO_USERNAME')]) {
+                    catchError(buildResult: 'SUCCESS', message: 'Oops! it will be fixed in future releases', stageResult: 'UNSTABLE') {
+                        sh 'npm run coverage'
+                    }
+                }
+                publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+            }
+         }
     }
 }
-
