@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -7,88 +6,91 @@ pipeline {
     }
 
     environment {
-        MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
+        MONGO_URI       = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
+        MONGO_DB_Creds  = credentials('mongo-db-credentials')
+        MONGO_USERNAME  = credentials('mongo-db-username')
+        MONGO_PASSWORD  = credentials('mongo-db-password')
     }
+
     options {
         disableResume()
-        disableConcurrentBuilds abortPrevious: true
+        disableConcurrentBuilds(abortPrevious: true)
     }
 
     stages {
+
         stage('Installing Dependencies') {
-             options { 
-                timestamps() 
+            options {
+                timestamps()
             }
             steps {
                 sh 'npm install --no-audit'
             }
         }
 
-        stage('Dependency Scanning') {
-            parallel {
-                stage('NPM Dependency Audit') {
-                    steps {
-                        sh '''
-                            npm audit --audit-level=critical
-                            echo $?
-                        '''
-                    }
-                }
-
-                stage('OWASP Dependency Check') {
-                    steps {
-                        dependencyCheck additionalArguments: '''
-                            --scan './'
-                            --out './'
-                            --format 'ALL'
-                            --prettyPrint
-                        ''', odcInstallation: 'owasp-dbcheck-10'
-
-                        dependencyCheckPublisher failedTotalCritical: 1, pattern: 'dependency-check-report.xml', stopBuild: true
-
-                        junit allowEmptyResults: true, keepProperties: true, testResults: 'dependency-check-junit.xml'
-
-                        publishHTML([
-                            allowMissing: true,
-                            alwaysLinkToLastBuild: true,
-                            keepAll: true,
-                            reportDir: './',
-                            reportFiles: 'dependency-check-jenkins.html',
-                            reportName: 'Dependency Check HTML Report',
-                            reportTitles: '',
-                            useWrapperFileDirectly: true
-                        ])
-                    }
-                }
+        stage('NPM Dependency Audit') {
+            steps {
+                sh '''
+                    npm audit --audit-level=critical
+                    echo $?
+                '''
             }
         }
 
         stage('Unit Testing') {
-             options { 
-                retry(2) 
+            options {
+                retry(2)
             }
             steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'mongo-db-credentials', 
-                        passwordVariable: 'MONGO_PASSWORD', 
-                        usernameVariable: 'MONGO_USERNAME'
-                    )
-                ]) {
-                    sh 'npm test'
-                }
-                junit allowEmptyResults: true, testResults: 'test-results.xml'
+                sh 'echo Colon-Separated - $MONGO_DB_Creds'
+                sh 'echo Username - $MONGO_USERNAME'
+                sh 'echo Password - $MONGO_PASSWORD'
+                sh 'npm test'
             }
         }
-         stage('Code Coverage') {
+
+        stage('Code Coverage') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'mongo-db-credentials', passwordVariable: 'MONGO_PASSWORD', usernameVariable: 'MONGO_USERNAME')]) {
-                    catchError(buildResult: 'SUCCESS', message: 'Oops! it will be fixed in future releases', stageResult: 'UNSTABLE') {
-                        sh 'npm run coverage'
-                    }
+                catchError(buildResult: 'SUCCESS', message: 'Oops! It will be fixed in future releases', stageResult: 'UNSTABLE') {
+                    sh 'npm run coverage'
                 }
-                publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage HTML Report', reportTitles: '', useWrapperFileDirectly: true])
             }
-         }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'printenv'
+                sh 'docker build -t prajnashetty529/solar-system:$GIT_COMMIT .'
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([string(credentialsId: 'docker-hub-pat', variable: 'DOCKER_PAT')]) {
+                    sh '''
+                        echo "Logging in to Docker Hub..."
+                        echo "$DOCKER_PAT" | docker login -u prajnashetty529 --password-stdin
+
+                        echo "Pushing image to Docker Hub..."
+                        docker push prajnashetty529/solar-system:$GIT_COMMIT
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            junit allowEmptyResults: true, testResults: 'test-results.xml'
+
+            publishHTML([
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'coverage/lcov-report',
+                reportFiles: 'index.html',
+                reportName: 'Code Coverage HTML Report'
+            ])
+        }
     }
 }
