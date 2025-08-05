@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -8,7 +7,10 @@ pipeline {
 
     environment {
         MONGO_URI = "mongodb+srv://supercluster.d83jj.mongodb.net/superData"
+        APP_NAME = "solar-system"
+        DOCKER_IMAGE = "prajnashetty529/${APP_NAME}:${BUILD_NUMBER}"
     }
+
     options {
         disableResume()
         disableConcurrentBuilds abortPrevious: true
@@ -16,8 +18,8 @@ pipeline {
 
     stages {
         stage('Installing Dependencies') {
-             options { 
-                timestamps() 
+            options {
+                timestamps()
             }
             steps {
                 sh 'npm install --no-audit'
@@ -64,14 +66,14 @@ pipeline {
         }
 
         stage('Unit Testing') {
-             options { 
-                retry(2) 
+            options {
+                retry(2)
             }
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'mongo-db-credentials', 
-                        passwordVariable: 'MONGO_PASSWORD', 
+                        credentialsId: 'mongo-db-credentials',
+                        passwordVariable: 'MONGO_PASSWORD',
                         usernameVariable: 'MONGO_USERNAME'
                     )
                 ]) {
@@ -80,15 +82,57 @@ pipeline {
                 junit allowEmptyResults: true, testResults: 'test-results.xml'
             }
         }
-         stage('Code Coverage') {
+
+        stage('Code Coverage') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'mongo-db-credentials', passwordVariable: 'MONGO_PASSWORD', usernameVariable: 'MONGO_USERNAME')]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'mongo-db-credentials',
+                        passwordVariable: 'MONGO_PASSWORD',
+                        usernameVariable: 'MONGO_USERNAME'
+                    )
+                ]) {
                     catchError(buildResult: 'SUCCESS', message: 'Oops! it will be fixed in future releases', stageResult: 'UNSTABLE') {
                         sh 'npm run coverage'
                     }
                 }
-                publishHTML([allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true, reportDir: 'coverage/lcov-report', reportFiles: 'index.html', reportName: 'Code Coverage HTML Report', reportTitles: '', useWrapperFileDirectly: true])
+                publishHTML([
+                    allowMissing: true,
+                    alwaysLinkToLastBuild: true,
+                    keepAll: true,
+                    reportDir: 'coverage/lcov-report',
+                    reportFiles: 'index.html',
+                    reportName: 'Code Coverage HTML Report',
+                    reportTitles: '',
+                    useWrapperFileDirectly: true
+                ])
             }
-         }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerImage = docker.build("${DOCKER_IMAGE}")
+                }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    script {
+                        docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
+                            dockerImage.push()
+                        }
+                    }
+                }
+            }
+        }
     }
 }
