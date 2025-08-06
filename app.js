@@ -9,10 +9,34 @@ const serverless = require('serverless-http');
 
 const app = express();
 
+// CORS setup
+const corsOptions = {
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like curl or mobile apps)
+        if (!origin) return callback(null, true);
+
+        // Allowed origins for production
+        const allowedOrigins = ['http://localhost:3000'];  // Add your real domain here later
+
+        if (process.env.NODE_ENV === 'production') {
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            } else {
+                return callback(new Error('Not allowed by CORS'));
+            }
+        }
+
+        // Allow all origins in development
+        return callback(null, true);
+    },
+    credentials: true,
+};
+
+app.use(cors(corsOptions));
+
 // Middleware
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '/')));
-app.use(cors());
 
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
