@@ -19,13 +19,14 @@ pipeline {
 
     stages {
         stage('Installing Dependencies') {
-                    options {
-                        timestamps()
-                    }
-                    steps {
-                        sh 'npm install --no-audit'
-                    }
-                }
+            options {
+                timestamps()
+            }
+            steps {
+                sh 'npm install --no-audit'
+            }
+        }
+
         stage('NPM Dependency Audit') {
             steps {
                 sh '''
@@ -75,33 +76,20 @@ pipeline {
                 }
             }
         }
-    }
 
-    post {
-        always {
-            junit allowEmptyResults: true, testResults: 'test-results.xml'
-
-            publishHTML([
-                allowMissing: true,
-                alwaysLinkToLastBuild: true,
-                keepAll: true,
-                reportDir: 'coverage/lcov-report',
-                reportFiles: 'index.html',
-                reportName: 'Code Coverage HTML Report'
-            ])
-        }
-    }
-    
         stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
-                    docker run -d -p 8080:3000 --name solar-temp-container ${DOCKER_IMAGE}
+                    docker run -d -p 8080:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
                     sleep 10  # Give container time to boot up
                 '''
             }
         }
 
         stage('OWASP ZAP DAST Scan') {
+            environment {
+                ZAP_TARGET = 'http://localhost:8080'
+            }
             steps {
                 sh '''
                     docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \
@@ -115,6 +103,10 @@ pipeline {
         }
 
         stage('Upload ZAP Reports to AWS S3') {
+            environment {
+                AWS_REGION = 'US East (N. Virginia) us-east-1' // Set your actual AWS region here
+                S3_BUCKET = 'appsolar' // Replace with your actual S3 bucket name
+            }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-jenkins-creds']]) {
                     sh '''
@@ -150,6 +142,9 @@ pipeline {
         }
 
         stage('Deploy to Azure Web App') {
+            environment {
+                APP_NAME = 'solar-system-app' // Customize your app name
+            }
             steps {
                 withCredentials([file(credentialsId: 'azure-publish-profiles', variable: 'PUBLISH_PROFILE')]) {
                     sh '''
@@ -167,8 +162,19 @@ pipeline {
 
     post {
         always {
+            junit allowEmptyResults: true, testResults: 'test-results.xml'
+
+            publishHTML([
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'coverage/lcov-report',
+                reportFiles: 'index.html',
+                reportName: 'Code Coverage HTML Report'
+            ])
+
             archiveArtifacts artifacts: 'zap-report.*', fingerprint: true
             echo "ZAP reports archived and uploaded."
         }
     }
-} 
+}
