@@ -91,4 +91,84 @@ pipeline {
             ])
         }
     }
+    
+        stage('Deploy Temporary Container for ZAP Scan') {
+            steps {
+                sh '''
+                    docker run -d -p 8080:3000 --name solar-temp-container ${DOCKER_IMAGE}
+                    sleep 10  # Give container time to boot up
+                '''
+            }
+        }
+
+        stage('OWASP ZAP DAST Scan') {
+            steps {
+                sh '''
+                    docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \
+                        -t ${ZAP_TARGET} \
+                        -r zap-report.html \
+                        -J zap-report.json \
+                        -x zap-report.xml \
+                        -I
+                '''
+            }
+        }
+
+        stage('Upload ZAP Reports to AWS S3') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-jenkins-creds']]) {
+                    sh '''
+                        aws s3 cp zap-report.html s3://${S3_BUCKET}/zap-report.html --region ${AWS_REGION}
+                        aws s3 cp zap-report.json s3://${S3_BUCKET}/zap-report.json --region ${AWS_REGION}
+                        aws s3 cp zap-report.xml s3://${S3_BUCKET}/zap-report.xml --region ${AWS_REGION}
+                    '''
+                }
+            }
+        }
+
+        stage('Stop Temporary Container') {
+            steps {
+                sh '''
+                    docker stop solar-temp-container || true
+                    docker rm solar-temp-container || true
+                '''
+            }
+        }
+
+        stage('Approval for Production Deployment') {
+            steps {
+                script {
+                    def approvedBy = input(
+                        message: 'Approve Production Deployment?',
+                        parameters: [string(name: 'AdminUser', description: 'Enter admin username')]
+                    )
+                    if (approvedBy != 'admin') {
+                        error("Only admin can approve the deployment")
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Azure Web App') {
+            steps {
+                withCredentials([file(credentialsId: 'azure-publish-profiles', variable: 'PUBLISH_PROFILE')]) {
+                    sh '''
+                        zip -r ${APP_NAME}.zip .
+                        PUBLISH_URL=$(xmllint --xpath "string(//publishProfile[@publishMethod='MSDeploy']/publishUrl)" $PUBLISH_PROFILE)
+                        USERNAME=$(xmllint --xpath "string(//publishProfile[@publishMethod='MSDeploy']/userName)" $PUBLISH_PROFILE)
+                        PASSWORD=$(xmllint --xpath "string(//publishProfile[@publishMethod='MSDeploy']/userPWD)" $PUBLISH_PROFILE)
+
+                        curl -X POST -u $USERNAME:$PASSWORD --data-binary @${APP_NAME}.zip https://$PUBLISH_URL/api/zipdeploy
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'zap-report.*', fingerprint: true
+            echo "ZAP reports archived and uploaded."
+        }
+    }
 } 
