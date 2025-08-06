@@ -103,28 +103,22 @@ pipeline {
             }
         }
 
-         stage('OWASP ZAP DAST Scan') {
+        stage('OWASP ZAP DAST Scan') {
             environment {
-                ZAP_TARGET = 'http://localhost:8081'  // or host.docker.internal:8081 if not Linux
+                ZAP_TARGET = 'http://localhost:8081'
             }
             steps {
-                writeFile file: 'ignore_rules.txt', text: '''
-                .* | Unexpected Content-Type
-                '''
-        
                 sh '''
-                   docker run --rm \
-                   -v $(pwd):/zap/wrk/:rw \
-                   --network host \
-                   -t zaproxy/zap-stable zap-full-scan.py \
-                     -t ${ZAP_TARGET} \
-                     -r zap-report.html \
-                     -J zap-report.json \
-                     -x zap-report.xml \
-                     -I ignore_rules.txt
+                    chmod 777 $(pwd)
+                    docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-full-scan.py \
+                        -t http://localhost:8081 \
+                        -r zap-report.html \
+                        -J zap-report.json \
+                        -x zap-report.xml
                 '''
             }
         }
+
         
         stage('Upload ZAP Reports to AWS S3') {
             environment {
