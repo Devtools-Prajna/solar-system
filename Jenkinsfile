@@ -91,9 +91,12 @@ pipeline {
             }
         }
         stage('OWASP ZAP DAST Scan') {
+            environment {
+                ZAP_TARGET = 'http://localhost:8081'
+            }
             steps {
                 sh '''
-                    docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \
+                    docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-weekly zap-full-scan.py \
                         -t ${ZAP_TARGET} \
                         -r zap-report.html \
                         -J zap-report.json \
