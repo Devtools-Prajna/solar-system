@@ -77,16 +77,15 @@ pipeline {
             }
         }
 
-       stage('Deploy Temporary Container for ZAP Scan') {
+         stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
-                    # Get container ID if exists, remove it by ID
                     CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
                     if [ ! -z "$CONTAINER_ID" ]; then
                       docker rm -f $CONTAINER_ID
                     fi
         
-                    docker run -d -p 8080:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
+                    docker run -d -p 8081:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
                     sleep 10
                 '''
             }
@@ -94,7 +93,7 @@ pipeline {
         
         stage('OWASP ZAP DAST Scan') {
             environment {
-                ZAP_TARGET = 'http://localhost:8080'
+                ZAP_TARGET = 'http://localhost:8081'
             }
             steps {
                 sh '''
@@ -107,6 +106,7 @@ pipeline {
                 '''
             }
         }
+
 
         stage('Upload ZAP Reports to AWS S3') {
             environment {
