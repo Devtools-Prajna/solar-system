@@ -77,33 +77,7 @@ pipeline {
             }
         }
 
-           stage('Deploy Temporary Container for ZAP Scan') {
-            steps {
-                sh '''
-                    CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
-                    if [ ! -z "$CONTAINER_ID" ]; then
-                        echo "Container $CONTAINER_ID exists, trying to remove..."
-                        docker rm -f $CONTAINER_ID 2>/dev/null || true
-                        
-                        for i in $(seq 1 15); do
-                            sleep 1
-                            CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
-                            if [ -z "$CONTAINER_ID" ]; then
-                                echo "Container successfully removed."
-                                break
-                            else
-                                echo "Still waiting for container removal (attempt $i)..."
-                            fi
-                        done
-                    else
-                        echo "No existing container found."
-                    fi
-        
-                    docker run -d -p 8081:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
-                    sleep 10
-                '''
-            }
-        }
+          
         
         stage('OWASP ZAP DAST Scan') {
             environment {
