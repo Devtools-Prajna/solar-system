@@ -64,7 +64,7 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'docker-hub-pat', variable: 'DOCKER_PAT')]) {
+                withCredentials([string(credentialsId: 'DOCKER_PAT', variable: 'DOCKER_PAT')]) {
                     sh '''
                         echo "Logging in to Docker Hub..."
                         echo "$DOCKER_PAT" | docker login -u prajnashetty529 --password-stdin
