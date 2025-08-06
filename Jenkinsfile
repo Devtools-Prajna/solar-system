@@ -110,12 +110,14 @@ pipeline {
             steps {
                 sh '''
                   chmod 777 $(pwd)
-                  docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-full-scan.py \
-                     -t http://localhost:8081 \
-                     -r zap-report.html \
-                     -J zap-report.json \
-                     -x zap-report.xml
-
+                    docker run -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zap-api-scan.py \
+                    -t http://134.209.155.222:30000/api-docs/ \
+                    -f openapi \
+                    -r zap_report.html \
+                    -w zap_report.md \
+                    -J zap_json_report.json \
+                    -x zap_xml_report.xml \
+                    -c zap_ignore_rules
                 '''
             }
         }
