@@ -103,36 +103,45 @@ pipeline {
             }
         }
 
-        stage('OWASP ZAP DAST Scan') {
+         stage('OWASP ZAP DAST Scan') {
             environment {
-                ZAP_TARGET = 'http://localhost:8081'
+                ZAP_TARGET = 'http://localhost:8081'  // or host.docker.internal:8081 if not Linux
             }
             steps {
+                writeFile file: 'ignore_rules.txt', text: '''
+                .* | Unexpected Content-Type
+                '''
+        
                 sh '''
-                   docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-full-scan.py \
-                      -t http://localhost:8081 \
-                      -r zap-report.html \
-                      -J zap-report.json \
-                      -x zap-report.xml
+                   docker run --rm \
+                   -v $(pwd):/zap/wrk/:rw \
+                   --network host \
+                   -t zaproxy/zap-stable zap-full-scan.py \
+                     -t ${ZAP_TARGET} \
+                     -r zap-report.html \
+                     -J zap-report.json \
+                     -x zap-report.xml \
+                     -I ignore_rules.txt
                 '''
             }
         }
-
+        
         stage('Upload ZAP Reports to AWS S3') {
             environment {
-                AWS_REGION = 'US East (N. Virginia) us-east-1' // Set your actual AWS region here
-                S3_BUCKET = 'appsolar' // Replace with your actual S3 bucket name
+                AWS_REGION = 'us-east-1'
+                S3_BUCKET = 'appsolar'
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-jenkins-creds']]) {
                     sh '''
-                        aws s3 cp zap-report.html s3://${S3_BUCKET}/zap-report.html --region ${AWS_REGION}
-                        aws s3 cp zap-report.json s3://${S3_BUCKET}/zap-report.json --region ${AWS_REGION}
-                        aws s3 cp zap-report.xml s3://${S3_BUCKET}/zap-report.xml --region ${AWS_REGION}
+                        aws s3 cp zap-report.html s3://${S3_BUCKET}/zap-reports/zap-report.html --region ${AWS_REGION} --acl private
+                        aws s3 cp zap-report.json s3://${S3_BUCKET}/zap-reports/zap-report.json --region ${AWS_REGION} --acl private
+                        aws s3 cp zap-report.xml s3://${S3_BUCKET}/zap-reports/zap-report.xml --region ${AWS_REGION} --acl private
                     '''
                 }
             }
         }
+
 
         stage('Stop Temporary Container') {
             steps {
