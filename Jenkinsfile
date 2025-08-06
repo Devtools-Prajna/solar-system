@@ -91,22 +91,25 @@ pipeline {
             }
         }
         
-        stage('OWASP ZAP DAST Scan') {
+             stage('OWASP ZAP DAST Scan') {
             environment {
                 ZAP_TARGET = 'http://localhost:8081'
             }
             steps {
-                sh '''
-                    docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \
-                        -t ${ZAP_TARGET} \
-                        -r zap-report.html \
-                        -J zap-report.json \
-                        -x zap-report.xml \
-                        -I
-                '''
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py \
+                            -t ${ZAP_TARGET} \
+                            -r zap-report.html \
+                            -J zap-report.json \
+                            -x zap-report.xml \
+                            -I
+                        docker logout
+                    '''
+                }
             }
         }
-
 
         stage('Upload ZAP Reports to AWS S3') {
             environment {
