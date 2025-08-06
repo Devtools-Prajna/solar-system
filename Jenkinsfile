@@ -79,31 +79,43 @@ pipeline {
         stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
-                    CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
-                    if [ ! -z "$CONTAINER_ID" ]; then
-                        echo "Container $CONTAINER_ID exists, trying to remove..."
-                        docker rm -f $CONTAINER_ID 2>/dev/null || true
-                        
-                        for i in $(seq 1 15); do
-                            sleep 1
-                            CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
-                            if [ -z "$CONTAINER_ID" ]; then
-                                echo "Container successfully removed."
-                                break
-                            else
-                                echo "Still waiting for container removal (attempt $i)..."
-                            fi
-                        done
-                    else
-                        echo "No existing container found."
+                    CONTAINER_NAME="solar-temp-container"
+        
+                    # Check for existing container with that name
+                    EXISTING_CONTAINER=$(docker ps -a -q -f name=^/${CONTAINER_NAME}$)
+        
+                    if [ ! -z "$EXISTING_CONTAINER" ]; then
+                      echo "Container $EXISTING_CONTAINER exists, trying to remove..."
+                      docker rm -f $EXISTING_CONTAINER || true
+        
+                      # Wait for container to be fully removed (up to 30 seconds)
+                      for i in $(seq 1 30); do
+                        sleep 1
+                        EXISTING_CONTAINER=$(docker ps -a -q -f name=^/${CONTAINER_NAME}$)
+                        if [ -z "$EXISTING_CONTAINER" ]; then
+                          echo "Container successfully removed."
+                          break
+                        else
+                          echo "Still waiting for container removal (attempt $i)..."
+                          docker rm -f $EXISTING_CONTAINER || true
+                        fi
+                      done
+        
+                      # Check one last time before continuing
+                      EXISTING_CONTAINER=$(docker ps -a -q -f name=^/${CONTAINER_NAME}$)
+                      if [ ! -z "$EXISTING_CONTAINER" ]; then
+                        echo "Failed to remove container after multiple attempts, exiting."
+                        exit 1
+                      fi
                     fi
         
-                    docker run -d -p 8081:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
+                    # Run new container
+                    docker run -d -p 8081:3000 --name $CONTAINER_NAME prajnashetty529/solar-system:$GIT_COMMIT
                     sleep 10
                 '''
             }
         }
-        
+
         stage('OWASP ZAP DAST Scan') {
             environment {
                 ZAP_TARGET = 'http://localhost:8081/api-docs/'  // Update this if your API docs path differs
