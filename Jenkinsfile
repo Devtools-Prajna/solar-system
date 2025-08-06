@@ -110,11 +110,11 @@ pipeline {
             steps {
                 sh '''
                   chmod 777 $(pwd)
-                    docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-full-scan.py \
-                        -t http://localhost:8081 \
-                        -r zap-report.html \
-                        -J zap-report.json \
-                        -x zap-report.xml
+                  docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap-full-scan.py \
+                     -t http://localhost:8081 \
+                     -r zap-report.html \
+                     -J zap-report.json \
+                     -x zap-report.xml
 
                 '''
             }
