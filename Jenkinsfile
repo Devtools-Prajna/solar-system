@@ -109,12 +109,13 @@ pipeline {
             }
             steps {
                 sh '''
-                     docker run --network host -v $(pwd):/zap/wrk/:rw -t ghcr.io/zaproxy/zap2docker-weekly:weekly zap-full-scan.py \
-                        -t ${ZAP_TARGET} \
-                        -r zap-report.html \
-                        -J zap-report.json \
-                        -x zap-report.xml \
-                        -I
+                    docker run --network host -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-full-scan.py \
+                          -t http://localhost:8081 \
+                          -r zap-report.html \
+                          -J zap-report.json \
+                          -x zap-report.xml \
+                          -I
+
                 '''
             }
         }
