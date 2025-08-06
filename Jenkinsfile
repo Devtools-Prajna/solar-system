@@ -80,11 +80,13 @@ pipeline {
         stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
+                    docker rm -f solar-temp-container || true
                     docker run -d -p 8080:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
                     sleep 10  # Give container time to boot up
                 '''
             }
         }
+
 
         stage('OWASP ZAP DAST Scan') {
             environment {
