@@ -77,24 +77,26 @@ pipeline {
             }
         }
 
-         stage('Deploy Temporary Container for ZAP Scan') {
+           stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
                     CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
                     if [ ! -z "$CONTAINER_ID" ]; then
-                      echo "Container $CONTAINER_ID exists, trying to remove..."
-                      docker rm -f $CONTAINER_ID 2>/dev/null || true
-                      
-                      for i in $(seq 1 15); do
-                        sleep 1
-                        CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
-                        if [ -z "$CONTAINER_ID" ]; then
-                          echo "Container successfully removed."
-                          break
-                        else
-                          echo "Still waiting for container removal (attempt $i)..."
-                        fi
-                      done
+                        echo "Container $CONTAINER_ID exists, trying to remove..."
+                        docker rm -f $CONTAINER_ID 2>/dev/null || true
+                        
+                        for i in $(seq 1 15); do
+                            sleep 1
+                            CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
+                            if [ -z "$CONTAINER_ID" ]; then
+                                echo "Container successfully removed."
+                                break
+                            else
+                                echo "Still waiting for container removal (attempt $i)..."
+                            fi
+                        done
+                    else
+                        echo "No existing container found."
                     fi
         
                     docker run -d -p 8081:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
@@ -102,38 +104,37 @@ pipeline {
                 '''
             }
         }
-
+        
         stage('OWASP ZAP DAST Scan') {
             environment {
-                ZAP_TARGET = 'http://localhost:8081'
+                ZAP_TARGET = 'http://localhost:8081/api-docs/'  // Update this if your API docs path differs
             }
             steps {
                 sh '''
-                  chmod 777 $(pwd)
+                    chmod 777 $(pwd)
                     docker run -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zap-api-scan.py \
-                    -t http://134.209.155.222:30000/api-docs/ \
-                    -f openapi \
-                    -r zap_report.html \
-                    -w zap_report.md \
-                    -J zap_json_report.json \
-                    -x zap_xml_report.xml \
-                    -c zap_ignore_rules
+                        -t ${ZAP_TARGET} \
+                        -f openapi \
+                        -r zap_report.html \
+                        -w zap_report.md \
+                        -J zap_report.json \
+                        -x zap_report.xml \
+                        -c zap_ignore_rules
                 '''
             }
         }
-
         
         stage('Upload ZAP Reports to AWS S3') {
             environment {
                 AWS_REGION = 'us-east-1'
-                S3_BUCKET = 'appsolar'
+                S3_BUCKET = 'my-aws-bucket-prajna'
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-jenkins-creds']]) {
                     sh '''
-                        aws s3 cp zap-report.html s3://${S3_BUCKET}/zap-reports/zap-report.html --region ${AWS_REGION} --acl private
-                        aws s3 cp zap-report.json s3://${S3_BUCKET}/zap-reports/zap-report.json --region ${AWS_REGION} --acl private
-                        aws s3 cp zap-report.xml s3://${S3_BUCKET}/zap-reports/zap-report.xml --region ${AWS_REGION} --acl private
+                        aws s3 cp zap_report.html s3://${S3_BUCKET}/zap-reports/zap_report.html --region ${AWS_REGION} --acl private
+                        aws s3 cp zap_report.json s3://${S3_BUCKET}/zap-reports/zap_report.json --region ${AWS_REGION} --acl private
+                        aws s3 cp zap_report.xml s3://${S3_BUCKET}/zap-reports/zap_report.xml --region ${AWS_REGION} --acl private
                     '''
                 }
             }
