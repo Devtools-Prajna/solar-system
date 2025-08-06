@@ -76,7 +76,7 @@ pipeline {
                 }
             }
         }
-         stage('Deploy Temporary Container for ZAP Scan') {
+        stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
                     CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
@@ -103,8 +103,6 @@ pipeline {
                 '''
             }
         }
-
-          
         
         stage('OWASP ZAP DAST Scan') {
             environment {
@@ -113,14 +111,13 @@ pipeline {
             steps {
                 sh '''
                     chmod 777 $(pwd)
-                    chmod 777 $(pwd)
-                        docker run -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy zap-api-scan.py \
-                        -t http://134.209.155.222:30000/api-docs/ \
+                    docker run -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zap-api-scan.py \
+                        -t ${ZAP_TARGET} \
                         -f openapi \
                         -r zap_report.html \
                         -w zap_report.md \
-                        -J zap_json_report.json \
-                        -x zap_xml_report.xml \
+                        -J zap_report.json \
+                        -x zap_report.xml \
                         -c zap_ignore_rules
                 '''
             }
@@ -129,7 +126,7 @@ pipeline {
         stage('Upload ZAP Reports to AWS S3') {
             environment {
                 AWS_REGION = 'us-east-1'
-                S3_BUCKET = 'my-aws-bucket-prajna'
+                S3_BUCKET = 'appsolar'
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-jenkins-creds']]) {
@@ -141,7 +138,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Stop Temporary Container') {
             steps {
