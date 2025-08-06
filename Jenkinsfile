@@ -115,7 +115,7 @@ pipeline {
                 '''
             }
         }
-
+        
         stage('OWASP ZAP DAST Scan') {
             environment {
                 ZAP_TARGET = 'http://localhost:8081'
@@ -123,7 +123,9 @@ pipeline {
             steps {
                 sh '''
                     chmod 777 $(pwd)
-                    docker run -v $(pwd):/zap/wrk/:rw --rm docker.io/zaproxy/zap2docker-stable zap-api-scan.py \
+        
+                    docker run --rm -v $(pwd):/zap/wrk/:rw \
+                        ghcr.io/zaproxy/zap-api-scan \
                         -t $ZAP_TARGET/api-docs/ \
                         -f openapi \
                         -r zap_report.html \
@@ -134,7 +136,7 @@ pipeline {
                 '''
             }
         }
-
+        
         
         stage('Upload ZAP Reports to AWS S3') {
             environment {
