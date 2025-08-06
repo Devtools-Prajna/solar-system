@@ -77,31 +77,34 @@ pipeline {
             }
         }
 
-         stage('Deploy Temporary Container for ZAP Scan') {
+        stage('Deploy Temporary Container for ZAP Scan') {
             steps {
                 sh '''
                     CONTAINER_ID=$(docker ps -a -q -f name=^/solar-temp-container$)
                     if [ ! -z "$CONTAINER_ID" ]; then
                       docker rm -f $CONTAINER_ID
                     fi
-        
+
                     docker run -d -p 8081:3000 --name solar-temp-container prajnashetty529/solar-system:$GIT_COMMIT
                     sleep 10
                 '''
             }
         }
+
         stage('OWASP ZAP DAST Scan') {
             environment {
                 ZAP_TARGET = 'http://localhost:8081'
             }
             steps {
                 sh '''
-                    docker run --network host -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-weekly zap-full-scan.py \
+                    chmod 777 $(pwd)
+                    docker run -v $(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zap-api-scan.py \
                         -t ${ZAP_TARGET} \
+                        -f openapi \
                         -r zap-report.html \
+                        -w zap-report.md \
                         -J zap-report.json \
-                        -x zap-report.xml \
-                        -I
+                        -x zap-report.xml
                 '''
             }
         }
@@ -130,7 +133,7 @@ pipeline {
                 '''
             }
         }
-
+        
         stage('Approval for Production Deployment') {
             steps {
                 script {
